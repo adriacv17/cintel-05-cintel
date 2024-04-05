@@ -1,161 +1,177 @@
-# --------------------------------------------
-# Imports at the top - PyShiny EXPRESS VERSION
-# --------------------------------------------
-
-# From shiny, import just reactive and render
 from shiny import reactive, render
-
-# From shiny.express, import just ui
 from shiny.express import ui
-
-# Imports from Python Standard Library to simulate live data
 import random
 from datetime import datetime
+from collections import deque
+import pandas as pd
+import plotly.express as px
+from ipyleaflet import Map
+from shinywidgets import render_plotly, render_widget
+from shinyswatch import theme
+from scipy import stats
+from faicons import icon_svg # https://fontawesome.com/v4/cheatsheet/
 
-# --------------------------------------------
-# Import icons as you like
-# --------------------------------------------
-
-from faicons import icon_svg
-
-# --------------------------------------------
-# FOR LOCAL DEVELOPMENT
-# --------------------------------------------
-# Add all packages not in the Std Library
-# to requirements.txt:
-#
-# faicons
-# shiny
-# shinylive
-# 
-# And install them into an active project virtual environment (usually in .venv)
-# --------------------------------------------
-
-# --------------------------------------------
-# SET UP THE REACIVE CONTENT
-# --------------------------------------------
-
-# --------------------------------------------
-# PLANNING: We want to get a fake temperature and 
-# Time stamp every N seconds. 
-# For now, we'll avoid storage and just 
-# Try to get the fake live data working and sketch our app. 
-# We can do all that with one reactive calc.
-# Use constants for update interval so it's easy to modify.
-# ---------------------------------------------------------
-
-# --------------------------------------------
 # First, set a constant UPDATE INTERVAL for all live data
-# Constants are usually defined in uppercase letters
-# Use a type hint to make it clear that it's an integer (: int)
-# --------------------------------------------
 
 UPDATE_INTERVAL_SECS: int = 1
 
-# --------------------------------------------
-# Initialize a REACTIVE CALC that our display components can call
-# to get the latest data and display it.
-# The calculation is invalidated every UPDATE_INTERVAL_SECS
-# to trigger updates.
-# It returns everything needed to display the data.
-# Very easy to expand or modify.
-# (I originally looked at REACTIVE POLL, but this seems to work better.)
-# --------------------------------------------
+# Initialize a REACTIVE VALUE with a common data structure
+# This reactive value is a wrapper around a DEQUE of readings
 
+DEQUE_SIZE: int = 10
+reactive_value_wrapper = reactive.value(deque(maxlen=DEQUE_SIZE))
+
+# Initialize a REACTIVE CALC that all display components can call
+# to get the latest data and display it.
 
 @reactive.calc()
 def reactive_calc_combined():
     # Invalidate this calculation every UPDATE_INTERVAL_SECS to trigger updates
     reactive.invalidate_later(UPDATE_INTERVAL_SECS)
 
-    # Data generation logic. Get random between -18 and -16 C, rounded to 1 decimal place
-    temp = round(random.uniform(-18, -16), 1)
-
-    # Get a timestamp for "now" and use string format strftime() method to format it
-    # 
+    # Data generation logic
+    temp = round(random.uniform(20, 21), 1)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    latest_dictionary_entry = {"temp": temp, "timestamp": timestamp}
+    new_deque_info = {"temp":temp, "timestamp":timestamp}
 
-    # Return everything we need
-    return latest_dictionary_entry
+    # get the deque and append the new entry
+    reactive_value_wrapper.get().append(new_deque_info)
 
-# ------------------------------------------------
-# Define the Shiny UI Page layout - Page Options
-# ------------------------------------------------
+    # Get a snapshot of the current deque for any further processing
+    deque_snapshot = reactive_value_wrapper.get()
 
+    # For Display: Convert deque to DataFrame for display
+    deque_df = pd.DataFrame(deque_snapshot)
+
+    # For Display: Get the latest dictionary entry
+    latest_deque_entry = new_deque_info
+
+    # Return a tuple with everything we need
+    # Every time we call this function, we'll get all these values
+    return deque_snapshot, deque_df, latest_deque_entry
+
+# Define the Shiny UI Page layout
 # Call the ui.page_opts() function
-# Set title to a string in quotes that will appear at the top
-# Set fillable to True to use the whole page width for the UI
-
-ui.page_opts(title="PyShiny Express: Live Data (Basic)", fillable=True)
-
-# ------------------------------------------------
-# Define the Shiny UI Page layout - Sidebar
-# ------------------------------------------------
-
-# Sidebar is typically used for user interaction/information
-# Note the with statement to create the sidebar followed by a colon
-# Everything in the sidebar is indented consistently
+ui.page_opts(title="PyShiny Express: Live Random Data", fillable=True)
+theme.superhero()
 
 with ui.sidebar(open="open"):
 
-    ui.h2("Antarctic Explorer", class_="text-center")
-
+    ui.h2("Oklahoma City Explorer", class_="text-center")
     ui.p(
-        "A demonstration of real-time temperature readings in Antarctica.",
+        "A demonstration of real-time temperature readings in Oklahoma City.",
         class_="text-center",
     )
-
+    
+    @render_widget(width="200%", height="200px")
+    def my_map():
+        return Map(center=(35.36, -97.38), zoom=10)
+        
     ui.hr()
-
     ui.h6("Links:")
-
     ui.a(
         "GitHub Source",
-        href="https://github.com/denisecase/cintel-05-cintel-basic",
+        href="https://github.com/adriacv17/cintel-05-cintel",
         target="_blank",
     )
-
     ui.a(
         "GitHub App",
-        href="https://denisecase.github.io/cintel-05-cintel-basic/",
+        href="https://denisecase.github.io/cintel-05-cintel/",
         target="_blank",
     )
-
     ui.a("PyShiny", href="https://shiny.posit.co/py/", target="_blank")
-
-
-#---------------------------------------------------------------------
-# In Shiny Express, everything not in the sidebar is in the main panel
-#---------------------------------------------------------------------
+    ui.a(
+        "PyShiny Express",
+        href="hhttps://shiny.posit.co/blog/posts/shiny-express/",
+        target="_blank",
+    )
     
-ui.h2("Current Temperature")
 
-@render.text
-def display_temp():
-    """Get the latest reading and return a temperature string"""
-    latest_dictionary_entry = reactive_calc_combined()
-    return f"{latest_dictionary_entry['temp']} C"
+# In Shiny Express, everything not in the sidebar is in the main panel
 
-ui.p("warmer than usual")
-icon_svg("sun")
+with ui.layout_columns():
+    with ui.value_box(
+        showcase=icon_svg("fire"),
+        theme="bg-gradient-red-yellow",
+    ):
 
+        "Current Temperature"
 
-ui.hr()
+        @render.text
+        def display_temp():
+            """Get the latest reading and return a temperature string"""
+            deque_snapshot, deque_df, latest_deque_entry = reactive_calc_combined()
+            return f"{latest_deque_entry['temp']} C"
 
-ui.h2("Current Date and Time")
+        "warm as normal"
 
-@render.text
-def display_time():
-    """Get the latest reading and return a timestamp string"""
-    latest_dictionary_entry = reactive_calc_combined()
-    return f"{latest_dictionary_entry['timestamp']}"
+  
+
+    with ui.value_box(
+        showcase=icon_svg("clock"),
+        theme="bg-gradient-orange-yellow",
+    ):
+        "Current Date and Time"
+        @render.text
+        def display_time():
+            """Get the latest reading and return a timestamp string"""
+            deque_snapshot, deque_df, latest_deque_entry = reactive_calc_combined()
+            return f"{latest_deque_entry['timestamp']}"
 
 
 with ui.layout_columns():
-    with ui.card():
-        ui.card_header("Current Data (placeholder only)")
+    with ui.card(full_screen=True,width="200%", height="300px"):
+        ui.card_header("Most Recent Readings")
 
-with ui.layout_columns():
-    with ui.card():
-        ui.card_header("Current Chart (placeholder only)")
+        @render.data_frame
+        def display_deque_df():
+            """Get the latest reading and return a dataframe with current readings"""
+            deque_snapshot, deque_df, latest_deque_entry = reactive_calc_combined()
+            pd.set_option('display.width', None)        # Use maximum width
+            return render.DataGrid( deque_df,width="100%")
+
+    with ui.card(full_screen=True):
+        ui.card_header("Chart with Current Trend")
+
+        @render_plotly
+        def display_plot():
+            # Fetch from the reactive calc function
+            deque_snapshot, deque_df, latest_deque_entry = reactive_calc_combined()
+
+            # Ensure the DataFrame is not empty before plotting
+            if not deque_df.empty:
+                # Convert the 'timestamp' column to datetime for better plotting
+                deque_df["timestamp"] = pd.to_datetime(deque_df["timestamp"])
+
+                # Create scatter plot for readings
+                # pass in the deque_df, the name of the x column, the name of the y column,
+                # and more
+        
+                fig = px.scatter(deque_df,
+                x="timestamp",
+                y="temp",
+                title="Temperature Readings with Regression Line",
+                labels={"temp": "Temperature (°C)", "timestamp": "Time"},
+                color="temp",
+                color_continuous_scale=px.colors.sequential.Peach)
+                fig.update_layout(coloraxis_colorbar=dict(yanchor="top", y=0.9, x=1, ticks="outside"))
+                fig.update_layout(paper_bgcolor="yellow")
+                # Linear regression - we need to get a list of the
+                # Independent variable x values (time) and the
+                # Dependent variable y values (temp)
+                # then, it's pretty easy using scipy.stats.linregress()
+
+                # For x let's generate a sequence of integers from 0 to len(deque_df)
+                sequence = range(len(deque_df))
+                x_vals = list(sequence)
+                y_vals = deque_df["temp"]
+
+                slope, intercept, r_value, p_value, std_err = stats.linregress(x_vals, y_vals)
+                deque_df['best_fit_line'] = [slope * x + intercept for x in x_vals]
+
+                # Add the regression line to the figure
+                fig.add_scatter(x=deque_df["timestamp"], y=deque_df['best_fit_line'], mode='lines', name='Regression Line')
+ 
+                # Update layout as needed to customize further
+                fig.update_layout(xaxis_title="Time",yaxis_title="Temperature (°C)")
+            return fig

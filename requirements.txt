@@ -7,3 +7,5 @@ shiny - used to build our web app in Python
 shinylive - used to build to our docs folder and host our app on GitHub Pages
 shinywidgets - a wrapper for complex widgets like plotly charts
 favicon
+ipyleaflet
+shinyswatch
