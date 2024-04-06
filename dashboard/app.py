@@ -76,15 +76,10 @@ with ui.sidebar(open="open"):
     )
     ui.a(
         "GitHub App",
-        href="https://denisecase.github.io/cintel-05-cintel/",
+        href="https://adriacv17.github.io/cintel-05-cintel/",
         target="_blank",
     )
     ui.a("PyShiny", href="https://shiny.posit.co/py/", target="_blank")
-    ui.a(
-        "PyShiny Express",
-        href="hhttps://shiny.posit.co/blog/posts/shiny-express/",
-        target="_blank",
-    )
     
 
 # In Shiny Express, everything not in the sidebar is in the main panel
